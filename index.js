@@ -40,36 +40,40 @@ const server = net.createServer((socket) => {
       ].join("\r\n");
 
       if (path === "/") {
-        const homepage = [
-          "HTTP/1.1 200 OK",
-          "Content-Type: text/html",
-          "Content-Length: 26",
-          "",
-          "<h1>Welcome Home!</h1>",
-        ].join("\r\n");
-        socket.write(homepage);
+        var body = "<h1>Welcome Home!</h1>";
       } else if (path === "/about") {
-        const aboutPage = [
-          "HTTP/1.1 200 OK",
-          "Content-Type: text/html",
-          "Content-Length: 29",
-          "",
-          "<h1>About Us Page</h1>",
-        ].join("\r\n");
-        socket.write(aboutPage);
+        var body = "<h1>About Us Page</h1>";
       } else {
-        const notFound = [
-          "HTTP/1.1 404 Not Found",
-          "Content-Type: text/html",
-          "Content-Length: 23",
-          "",
-          "<h1>Page Not Found</h1>",
-        ].join("\r\n");
-        socket.write(notFound);
+        var body = "<h1>Page Not Found</h1>";
       }
-      socket.end();
+      const bodyLength = body.length;
+      let resHTML = [
+        "HTTP/1.1 200 OK",
+        "Content-Type: text/html",
+        `Content-Length: ${bodyLength}`,
+      ];
+      //connection status header
+      if (
+        headers.Connection &&
+        headers.Connection.toLowerCase() === "keep-alive"
+      ) {
+        resHTML.push("Connection: keep-alive");
+      } else {
+        resHTML.push("Connection: close");
+      }
+      resHTML.push("");
+      resHTML.push(body);
+      resHTML = resHTML.join("\r\n");
+      socket.write(resHTML);
+      if (
+        !headers.Connection ||
+        headers.Connection.toLowerCase() !== "keep-alive"
+      ) {
+        socket.end();
+      }
     } catch (e) {
       console.log(e);
+      socket.end();
     }
   });
 
