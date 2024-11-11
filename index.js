@@ -1,4 +1,5 @@
 const net = require("net");
+const { routes, sendRes, sendErr } = require("./routes.js");
 
 const port = 8080;
 const server = net.createServer((socket) => {
@@ -14,9 +15,10 @@ const server = net.createServer((socket) => {
       const [method, path, httpVersion] = lines[0].split(" ");
       //fetch the headers
       const headers = {};
-      lines.slice(1).forEach((line) => {
+      let bodyIndex = 0;
+      lines.slice(1).forEach((line, index) => {
         if (line === "") {
-          return;
+          bodyIndex = index + 2; // Line after the blank line is the start of the body
         }
         const [key, value] = line.split(": ");
         if (key && value) {
@@ -30,46 +32,23 @@ const server = net.createServer((socket) => {
       console.log(headers);
 
       //              RESPONSE
+      let reqBody = "";
+      if (method === "POST") {
+        reqBody = lines.slice(bodyIndex).join("\r\n");
+        const jsonBody = JSON.parse(reqBody);
+        console.log(reqBody);
+        console.log(jsonBody);
 
-      const res = [
-        "HTTP/1.1 200 OK",
-        "Content-Type: text/plain",
-        "Content-Length: 12",
-        "", //end of headers
-        "Hello World!", //body
-      ].join("\r\n");
+        if (routes[method] && routes[method][path]) {
+          routes[method][path](socket);
+        }
 
-      if (path === "/") {
-        var body = "<h1>Welcome Home!</h1>";
-      } else if (path === "/about") {
-        var body = "<h1>About Us Page</h1>";
-      } else {
-        var body = "<h1>Page Not Found</h1>";
-      }
-      const bodyLength = body.length;
-      let resHTML = [
-        "HTTP/1.1 200 OK",
-        "Content-Type: text/html",
-        `Content-Length: ${bodyLength}`,
-      ];
-      //connection status header
-      if (
-        headers.Connection &&
-        headers.Connection.toLowerCase() === "keep-alive"
-      ) {
-        resHTML.push("Connection: keep-alive");
-      } else {
-        resHTML.push("Connection: close");
-      }
-      resHTML.push("");
-      resHTML.push(body);
-      resHTML = resHTML.join("\r\n");
-      socket.write(resHTML);
-      if (
-        !headers.Connection ||
-        headers.Connection.toLowerCase() !== "keep-alive"
-      ) {
-        socket.end();
+        if (
+          !headers.Connection ||
+          headers.Connection.toLowerCase() !== "keep-alive"
+        ) {
+          socket.end();
+        }
       }
     } catch (e) {
       console.log(e);
