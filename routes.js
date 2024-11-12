@@ -6,14 +6,30 @@ const routes = {
     "/about": (socket) => {
       sendRes(socket, 200, "text/html", "<h1>About Us Page</h1>");
     },
+    "/search": (socket, headers, reqBody, queryParams) => {
+      try {
+        const query = queryParams.query || "none";
+        const limit = queryParams.limit || 5;
+        const body = `<h1>Search Query: ${query}, Limit: ${limit}</h1>`;
+        sendRes(socket, 200, "text/html", body);
+      } catch (e) {
+        sendErr(socket, 400, "text/html", "Invalid Search Query");
+      }
+    },
   },
   POST: {
     "/submit": (socket, headers, body) => {
-      const res =
-        headers["Content-Type"] === "application/json"
-          ? `Received JSON: ${body}`
-          : `${body}`;
-      sendRes(socket, 200, "text/plain", res);
+      try {
+        const jsonBody = JSON.parse(body);
+        sendRes(
+          socket,
+          200,
+          "application/json",
+          JSON.stringify({ msg: "Received", data: jsonBody }),
+        );
+      } catch (e) {
+        sendErr(socket, 400, "text/plain", "Invalid JSON");
+      }
     },
   },
 };

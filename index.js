@@ -12,7 +12,7 @@ const server = net.createServer((socket) => {
       //splitting the req by newline escape character
       const lines = req.split("\r\n");
       //the first line of lines sends us the method and path of the req.
-      const [method, path, httpVersion] = lines[0].split(" ");
+      const [method, rawPath] = lines[0].split(" ");
       //fetch the headers
       const headers = {};
       let bodyIndex = 0;
@@ -25,10 +25,8 @@ const server = net.createServer((socket) => {
           headers[key] = value;
         }
       });
-      console.log(lines);
       console.log(method);
-      console.log(path);
-      console.log(httpVersion);
+      console.log(rawPath);
       console.log(headers);
 
       //              RESPONSE
@@ -38,20 +36,35 @@ const server = net.createServer((socket) => {
         const jsonBody = JSON.parse(reqBody);
         console.log(reqBody);
         console.log(jsonBody);
+      }
+      // Extract query parameters
+      const [pathname, queryStr] = rawPath.split("?");
+      let queryParams = {};
+      if (queryStr) {
+        queryStr.split("&").forEach((part) => {
+          const [k, v] = part.split("=");
+          queryParams[k] = decodeURIComponent(v);
+        });
+      }
 
-        if (routes[method] && routes[method][path]) {
-          routes[method][path](socket);
-        }
+      console.log("Path:", pathname);
+      console.log("Query Params:", queryParams);
 
-        if (
-          !headers.Connection ||
-          headers.Connection.toLowerCase() !== "keep-alive"
-        ) {
-          socket.end();
-        }
+      //route logic
+      if (routes[method] && routes[method][pathname]) {
+        routes[method][pathname](socket, headers, reqBody, queryParams);
+      } else {
+        sendErr(socket, 404, "text/html", "<h1>404 Not Found</h1>");
+      }
+
+      if (
+        !headers.Connection ||
+        headers.Connection.toLowerCase() !== "keep-alive"
+      ) {
+        socket.end();
       }
     } catch (e) {
-      console.log(e);
+      sendErr(socket, 500, "text/plain", "Internal Server Error");
       socket.end();
     }
   });
