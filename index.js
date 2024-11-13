@@ -1,5 +1,8 @@
 const net = require("net");
 const { routes, sendRes, sendErr } = require("./routes.js");
+const querystring = require("querystring");
+const fs = require("fs");
+const path = require("path");
 
 const port = 8080;
 const server = net.createServer((socket) => {
@@ -29,32 +32,46 @@ const server = net.createServer((socket) => {
       console.log(rawPath);
       console.log(headers);
 
-      //              RESPONSE
-      let reqBody = "";
-      if (method === "POST") {
-        reqBody = lines.slice(bodyIndex).join("\r\n");
-        const jsonBody = JSON.parse(reqBody);
-        console.log(reqBody);
-        console.log(jsonBody);
-      }
       // Extract query parameters
       const [pathname, queryStr] = rawPath.split("?");
       let queryParams = {};
-      if (queryStr) {
-        queryStr.split("&").forEach((part) => {
-          const [k, v] = part.split("=");
-          queryParams[k] = decodeURIComponent(v);
-        });
-      }
+      // if (queryStr) {
+      //   queryStr.split("&").forEach((part) => {
+      //     const [k, v] = part.split("=");
+      //     queryParams[k] = decodeURIComponent(v);
+      //   });
+      // }
+      queryParams = querystring.parse(queryStr);
 
       console.log("Path:", pathname);
       console.log("Query Params:", queryParams);
 
-      //route logic
-      if (routes[method] && routes[method][pathname]) {
-        routes[method][pathname](socket, headers, reqBody, queryParams);
+      //              RESPONSE
+
+      //check if static files are served
+      const filePath = pathname === "/" ? "/index.html" : pathname;
+      const absolutePath = path.join(__dirname, "public", filePath);
+
+      //serve static files if there
+      if (
+        method === "GET" &&
+        fs.existsSync(absolutePath) &&
+        fs.statSync(absolutePath).isFile()
+      ) {
+        const extension = path.extname(absolutePath);
+        const content_type = getContentType(extension);
+        const body = fs.readFileSync(absolutePath);
+        sendRes(socket, 200, content_type, body);
       } else {
-        sendErr(socket, 404, "text/html", "<h1>404 Not Found</h1>");
+        handleRoutes(
+          socket,
+          method,
+          pathname,
+          headers,
+          lines,
+          bodyIndex,
+          queryParams,
+        );
       }
 
       if (
@@ -81,3 +98,46 @@ const server = net.createServer((socket) => {
 server.listen(port, "localhost", () => {
   console.log(`listening to port ${port}`);
 });
+
+const handleRoutes = (
+  socket,
+  method,
+  pathname,
+  headers,
+  lines,
+  bodyIndex,
+  queryParams,
+) => {
+  let reqBody = "";
+  if (method === "POST" || method === "PUT") {
+    reqBody = lines.slice(bodyIndex).join("\r\n");
+    const content_type = headers["Content-Type"];
+
+    if (content_type === "application/json") {
+      reqBody = JSON.parse(reqBody);
+    } else if (content_type === "application/x-www-form-urlencoded") {
+      reqBody = querystring.parse(reqBody);
+    }
+  }
+
+  //route logic
+  if (routes[method] && routes[method][pathname]) {
+    routes[method][pathname](socket, headers, reqBody, queryParams);
+  } else {
+    sendErr(socket, 404, "text/html", "<h1>404 Not Found</h1>");
+  }
+};
+
+function getContentType(ext) {
+  const mimeTypes = {
+    ".html": "text/html",
+    ".css": "text/css",
+    ".js": "application/javascript",
+    ".json": "application/json",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".gif": "image/gif",
+    ".ico": "image/x-icon",
+  };
+  return mimeTypes[ext] || "text/plain";
+}

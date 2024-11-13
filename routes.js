@@ -31,6 +31,17 @@ const routes = {
         sendErr(socket, 400, "text/plain", "Invalid JSON");
       }
     },
+    "/json": (socket, headers, body) => {
+      sendRes(socket, 200, "application/json", JSON.stringify(body));
+    },
+    "/form": (socket, headers, body) => {
+      sendRes(
+        socket,
+        200,
+        "text/html",
+        `<h1>Form Received</h1><p>${JSON.stringify(body)}</p>`,
+      );
+    },
   },
 };
 
